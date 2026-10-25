@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MissingLeanbackLauncher">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="true" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/plugin_name"
+        android:supportsRtl="true"
+        android:icon="@mipmap/ic_launcher"
+        android:banner="@drawable/tv_banner"
+        android:theme="@style/Theme.ProjectivyWallpaperProvider">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+        <activity
+            android:name=".SettingsActivity"
+            android:label="@string/plugin_name"
+            android:icon="@mipmap/ic_launcher"
+            android:banner="@drawable/tv_banner"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <service
+            android:name=".WallpaperProviderService"
+            android:exported="true"
+            android:label="@string/plugin_name"
+            android:icon="@mipmap/ic_launcher"
+            android:banner="@drawable/tv_banner"
+            tools:ignore="ExportedService">
+
+            <!-- Mandatory for the plugin to be detected, DO NOT CHANGE -->
+            <intent-filter>
+                <action android:name="tv.projectivy.plugin.WALLPAPER_PROVIDER"/>
+            </intent-filter>
+
+            <!-- Api version this plugin is compatible with -->
+            <meta-data
+                android:name="apiVersion"
+                android:value="1"/>
+
+            <!--Plugin UUID *** YOU NEED TO CHANGE IT *** -->
+            <!--https://www.uuidgenerator.net/version4 -->
+            <meta-data
+                android:name="uuid"
+                android:value="@string/plugin_uuid"/>
+
+            <!-- Plugin name -->
+            <meta-data
+                android:name="name"
+                android:value="@string/plugin_name"/>
+
+            <!-- Plugin activity called by Projectivy to configure it -->
+            <meta-data
+                android:name="settingsActivity"
+                android:value=".SettingsActivity"/>
+
+            <!-- How long should Projectivy keep wallpapers before a new request -->
+            <meta-data
+                android:name="itemsCacheDurationMillis"
+                android:value="@integer/items_cache_duration_millis"/>
+
+            <!-- This plugin will receive CARD_FOCUSED and PROGRAM_CARD_FOCUSED -->
+            <meta-data
+                android:name="updateMode"
+                android:value="12"/>
+        </service>
+
+    </application>
+
+</manifest>
