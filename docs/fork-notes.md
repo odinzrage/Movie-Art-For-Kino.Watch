@@ -1,5 +1,10 @@
 # Movie Art for Projectivy — форк под Kinowatch (без TMDB)
 
+> Исторические заметки по первой версии форка. Часть описания устарела: сейчас плагин не
+> пересылает `iconUri` как есть в режиме BLUR, а сам скачивает широкий (`wide`) вариант постера и
+> собирает картинку 16:9 (см. `buildLocalLandscapeWallpaper` в `WallpaperProviderService.kt`).
+> Актуальное описание — в [README](../README.md).
+
 ## Что изменено относительно оригинала
 
 1. **`WallpaperProviderService.kt`** — полностью переписана обработка `Event.ProgramCardFocused`:
