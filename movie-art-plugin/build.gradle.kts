@@ -18,8 +18,8 @@ configure<ApplicationExtension> {
         applicationId = "com.movieart.kinowatch"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "2.4.1-kinowatch-wide"
+        versionCode = 9
+        versionName = "2.5-kinowatch-wide"
 
         vectorDrawables.useSupportLibrary = true
         // No TMDB API key needed in this fork - posters come directly from the source

@@ -65,6 +65,16 @@ class WallpaperProviderService : Service() {
         return "[$time] вызов #$callNum\n$body"
     }
 
+    private fun dimColor(color: Int): Int {
+        val factor = (PreferencesManager.dynamicColorsBrightness / 100f).coerceIn(0.1f, 1f)
+        if (factor >= 0.999f) return color
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(color, hsv)
+        hsv[1] = hsv[1] * (0.6f + 0.4f * factor) // a bit less saturated as it gets darker
+        hsv[2] = hsv[2] * factor
+        return android.graphics.Color.HSVToColor(android.graphics.Color.alpha(color), hsv)
+    }
+
     fun fileUriExists(context: Context, fileUri: Uri): Boolean {
         return try {
             context.contentResolver.openInputStream(fileUri)?.close() // Try opening the URI
@@ -379,9 +389,13 @@ class WallpaperProviderService : Service() {
             // Fallback to dynamic colors
             if (event is Event.CardFocused) {
                 try {
+                    // Projectivy's colors are very bright; dim and slightly mute them so the result
+                    // is close to the launcher's own dynamic colors (user setting, default 60%).
+                    val lightColor = dimColor(event.lightColor)
+                    val darkColor = dimColor(event.darkColor)
                     val file = getCacheFile(
                         that,
-                        "gradient_${event.lightColor}_${event.darkColor}.json"
+                        "gradient_${lightColor}_${darkColor}.json"
                     )
                     if (!fileUriExists(that, Uri.fromFile(file))) {
                         val lottieEditor =
@@ -390,7 +404,7 @@ class WallpaperProviderService : Service() {
                             .load()
                             .replaceGradientColors(
                                 positions = listOf(0f, 1f), // Positions
-                                colors = listOf(event.lightColor, event.darkColor) // Colors
+                                colors = listOf(lightColor, darkColor) // Colors
                             )
                             .save(Uri.fromFile(file))
                     }
