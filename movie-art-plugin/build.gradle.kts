@@ -6,6 +6,18 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Version comes from the release tag: CI sets APP_VERSION from "v1.2.3" -> "1.2.3".
+// versionCode = major * 10000 + minor * 100 + patch, so it always grows with the version
+// and an update installs over the previous release. Local builds without APP_VERSION are "dev".
+val appVersionName: String = System.getenv("APP_VERSION")?.takeIf { it.isNotBlank() } ?: "0.0.0-dev"
+val appVersionCode: Int = run {
+    val match = Regex("""^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?$""").matchEntire(appVersionName)
+        ?: throw GradleException("APP_VERSION '$appVersionName' is not x.y.z or x.y.z-suffix")
+    val (major, minor, patch) = match.destructured.toList().take(3).map { it.toInt() }
+    if (minor > 99 || patch > 99) throw GradleException("minor and patch must be 0..99: $appVersionName")
+    maxOf(1, major * 10000 + minor * 100 + patch)
+}
+
 configure<ApplicationExtension> {
     namespace = "com.movieart.kinowatch"
     compileSdk = 36
@@ -18,8 +30,8 @@ configure<ApplicationExtension> {
         applicationId = "com.movieart.kinowatch"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "2.5-kinowatch-wide"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         vectorDrawables.useSupportLibrary = true
         // No TMDB API key needed in this fork - posters come directly from the source
