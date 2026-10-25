@@ -122,7 +122,7 @@ class WallpaperProviderService : Service() {
         override fun getWallpapers(event: Event?): List<Wallpaper> {
 
             // Debug bookkeeping, so we can diagnose what Projectivy is actually sending us from
-            // the Settings screen alone, without ADB. See KINOWATCH_FORK_README.md.
+            // the Settings screen alone, without ADB. See docs/fork-notes.md.
             PreferencesManager.getWallpapersCallCount += 1
             PreferencesManager.lastEventDebug = describeEventForDebug(event)
             if (event is Event.ProgramCardFocused) {

@@ -26,12 +26,25 @@ configure<ApplicationExtension> {
         // app (Kinowatch) via Android TV's PreviewProgram/WatchNext data.
     }
 
+    // Release key comes from the environment (CI secrets). Without it the release APK is signed
+    // with the debug key, so a local build still works without a private keystore.
+    val releaseStoreFile = System.getenv("RELEASE_STORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isDebuggable = false
-            // Signed with the standard debug key so the release APK is installable without a private keystore
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
