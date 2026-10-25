@@ -5,12 +5,15 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.leanback.app.GuidedStepSupportFragment
 import androidx.leanback.widget.GuidanceStylist.Guidance
 import androidx.leanback.widget.GuidedAction
 import com.movieart.kinowatch.helpers.BackgroundPickerHelper
+import com.movieart.kinowatch.helpers.KinoApi
 
 class SettingsFragment : GuidedStepSupportFragment() {
 
@@ -57,6 +60,26 @@ class SettingsFragment : GuidedStepSupportFragment() {
             .descriptionEditable(false)
             .build()
         actions.add(actionPickGallery)
+
+        // Trailer in the background (on/off) + its last status
+        val actionTrailer = GuidedAction.Builder(context)
+            .id(ACTION_ID_TRAILER)
+            .title(R.string.setting_trailer_title)
+            .description(trailerDescription())
+            .descriptionEditable(false)
+            .multilineDescription(true)
+            .build()
+        actions.add(actionTrailer)
+
+        // Kino.Watch account (needed once, so the plugin can look up trailers)
+        val actionAccount = GuidedAction.Builder(context)
+            .id(ACTION_ID_ACCOUNT)
+            .title(accountTitle())
+            .description(accountDescription())
+            .descriptionEditable(false)
+            .multilineDescription(true)
+            .build()
+        actions.add(actionAccount)
     }
 
     override fun onGuidedActionClicked(action: GuidedAction) {
@@ -94,7 +117,146 @@ class SettingsFragment : GuidedStepSupportFragment() {
             ACTION_ID_PICK_GALLERY -> {
                 openGalleryPicker()
             }
+
+            ACTION_ID_TRAILER -> {
+                PreferencesManager.trailerEnabled = !PreferencesManager.trailerEnabled
+                if (PreferencesManager.trailerEnabled && !KinoApi.isSignedIn(requireContext())) {
+                    Toast.makeText(context, R.string.setting_trailer_need_login, Toast.LENGTH_LONG).show()
+                }
+                refreshTrailerAction()
+            }
+
+            ACTION_ID_ACCOUNT -> {
+                val appContext = requireContext().applicationContext
+                when {
+                    loginInProgress -> {
+                        // second press cancels a running sign-in
+                        loginSession++
+                        loginInProgress = false
+                        loginMessage = null
+                    }
+                    KinoApi.isSignedIn(appContext) -> {
+                        KinoApi.signOut(appContext)
+                        loginMessage = null
+                    }
+                    else -> startLogin()
+                }
+                refreshAccountAction()
+                refreshTrailerAction()
+            }
         }
+    }
+
+    // ------------------------------------------------------------------ trailer / account
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    @Volatile private var loginSession = 0
+    private var loginInProgress = false
+    private var loginMessage: String? = null
+
+    private fun trailerDescription(): String {
+        val state = if (PreferencesManager.trailerEnabled) "On" else "Off"
+        return getString(
+            R.string.setting_trailer_description,
+            state,
+            KinoApi.getStatus(requireContext())
+        )
+    }
+
+    private fun accountTitle(): String {
+        return getString(
+            if (KinoApi.isSignedIn(requireContext())) R.string.setting_account_title_in
+            else R.string.setting_account_title_out
+        )
+    }
+
+    private fun accountDescription(): String {
+        loginMessage?.let { return it }
+        return getString(
+            if (KinoApi.isSignedIn(requireContext())) R.string.setting_account_description_in
+            else R.string.setting_account_description_out
+        )
+    }
+
+    private fun refreshTrailerAction() {
+        val position = findActionPositionById(ACTION_ID_TRAILER)
+        if (position >= 0) {
+            actions[position].description = trailerDescription()
+            notifyActionChanged(position)
+        }
+    }
+
+    private fun refreshAccountAction() {
+        val position = findActionPositionById(ACTION_ID_ACCOUNT)
+        if (position >= 0) {
+            actions[position].title = accountTitle()
+            actions[position].description = accountDescription()
+            notifyActionChanged(position)
+        }
+    }
+
+    /** Shows [message] in the account item, but only if this sign-in attempt is still the current one. */
+    private fun postAccountMessage(session: Int, message: String?, finished: Boolean) {
+        mainHandler.post {
+            if (session != loginSession || !isAdded) return@post
+            loginMessage = message
+            if (finished) loginInProgress = false
+            refreshAccountAction()
+            if (finished) refreshTrailerAction()
+        }
+    }
+
+    private fun startLogin() {
+        val appContext = requireContext().applicationContext
+        loginSession++
+        val session = loginSession
+        loginInProgress = true
+        loginMessage = getString(R.string.setting_account_connecting)
+
+        Thread {
+            val (device, error) = KinoApi.startDeviceLogin(appContext)
+            if (session != loginSession) return@Thread
+            if (device == null) {
+                postAccountMessage(session, "Could not start sign-in: $error", true)
+                return@Thread
+            }
+            postAccountMessage(
+                session,
+                "On your phone or PC open ${device.verificationUri}\nand enter the code:  ${device.userCode}\nWaiting for confirmation ... (press again to cancel)",
+                false
+            )
+            val deadline = System.currentTimeMillis() + device.expiresInSec * 1000L
+            val intervalMs = maxOf(device.intervalSec, 3) * 1000L
+            while (System.currentTimeMillis() < deadline && session == loginSession) {
+                try {
+                    Thread.sleep(intervalMs)
+                } catch (_: InterruptedException) {
+                    return@Thread
+                }
+                if (session != loginSession) return@Thread
+                val result = KinoApi.pollDeviceLogin(appContext, device.code)
+                when (result.state) {
+                    KinoApi.PollState.SIGNED_IN -> {
+                        postAccountMessage(session, null, true)
+                        return@Thread
+                    }
+                    KinoApi.PollState.FAILED -> {
+                        postAccountMessage(session, "Sign-in failed: ${result.message}", true)
+                        return@Thread
+                    }
+                    KinoApi.PollState.PENDING -> { }
+                }
+            }
+            if (session == loginSession) {
+                postAccountMessage(session, "The code expired. Press to try again.", true)
+            }
+        }.start()
+    }
+
+    override fun onDestroy() {
+        loginSession++ // stop a running sign-in when the screen is closed
+        super.onDestroy()
     }
 
     private fun openGalleryPicker() {
@@ -194,6 +356,8 @@ class SettingsFragment : GuidedStepSupportFragment() {
         private const val ACTION_ID_FALLBACK_BG_TOGGLE = 3L
         private const val ACTION_ID_PICK_GALLERY = 4L
         private const val ACTION_ID_DYNAMIC_BRIGHTNESS = 5L
+        private const val ACTION_ID_TRAILER = 6L
+        private const val ACTION_ID_ACCOUNT = 7L
         private val BRIGHTNESS_STEPS = listOf(100, 75, 60, 45, 30)
 
         private const val REQUEST_CODE_PICK_IMAGE = 100

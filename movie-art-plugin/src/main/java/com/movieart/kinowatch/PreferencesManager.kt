@@ -26,6 +26,7 @@ object PreferencesManager {
     const val KEY_VIDEO_FORCED_UPDATE_COUNT = "video_forced_update_count"
     const val KEY_LAST_CACHE_CLEAN = "last_cache_clean"
     const val KEY_DYNAMIC_COLORS_BRIGHTNESS = "dynamic_colors_brightness"
+    const val KEY_TRAILER_ENABLED = "trailer_enabled"
     const val KEY_LAST_EVENT_DEBUG = "last_event_debug"
     const val KEY_GET_WALLPAPERS_CALL_COUNT = "get_wallpapers_call_count"
     const val KEY_LAST_PROGRAM_CARD_DEBUG = "last_program_card_debug"
@@ -84,6 +85,11 @@ object PreferencesManager {
     var dynamicColorsBrightness: Int
         get() = get(KEY_DYNAMIC_COLORS_BRIGHTNESS, 60)
         set(value) = set(KEY_DYNAMIC_COLORS_BRIGHTNESS, value)
+
+    // Play the title's trailer in the background a few seconds after the still image.
+    var trailerEnabled: Boolean
+        get() = get(KEY_TRAILER_ENABLED, false)
+        set(value) = set(KEY_TRAILER_ENABLED, value)
 
     var lastCacheClean: Long
         get() = get(KEY_LAST_CACHE_CLEAN, 0L)

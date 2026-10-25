@@ -11,6 +11,14 @@
     <!-- Custom App Background Settings -->
     <string name="setting_fallback_bg_title">Fallback Background</string>
     <string name="setting_fallback_bg_description">For cards that are not a movie or show\nᐅ %1$s</string>
+    <string name="setting_trailer_title">Trailer in Background</string>
+    <string name="setting_trailer_description">Plays the trailer of the focused title a few seconds after the picture\nᐅ %1$s\nStatus: %2$s</string>
+    <string name="setting_trailer_need_login">Sign in to Kino.Watch first (item below)</string>
+    <string name="setting_account_title_out">Kino.Watch Account: not signed in</string>
+    <string name="setting_account_title_in">Kino.Watch Account: signed in</string>
+    <string name="setting_account_description_out">Needed once for trailers. Press to get a code and enter it on the Kino.Watch website</string>
+    <string name="setting_account_description_in">Press to sign out</string>
+    <string name="setting_account_connecting">Contacting Kino.Watch ...</string>
     <string name="setting_dynamic_brightness_title">Dynamic Colors Brightness</string>
     <string name="setting_dynamic_brightness_description">How bright the colored background is for apps\nᐅ %1$d%%</string>
     <string name="setting_pick_no_app">No file manager or gallery found. Install one (for example Solid Explorer).</string>

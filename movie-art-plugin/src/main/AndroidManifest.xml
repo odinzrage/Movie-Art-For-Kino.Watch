@@ -28,6 +28,7 @@
     </queries>
 
     <application
+        android:usesCleartextTraffic="true"
         android:allowBackup="true"
         android:label="@string/plugin_name"
         android:supportsRtl="true"
@@ -98,10 +99,10 @@
                 android:name="itemsCacheDurationMillis"
                 android:value="@integer/items_cache_duration_millis"/>
 
-            <!-- This plugin will receive CARD_FOCUSED and PROGRAM_CARD_FOCUSED -->
+            <!-- This plugin will receive CARD_FOCUSED, PROGRAM_CARD_FOCUSED and TIME_ELAPSED (used to start the trailer) -->
             <meta-data
                 android:name="updateMode"
-                android:value="12"/>
+                android:value="13"/>
         </service>
 
     </application>

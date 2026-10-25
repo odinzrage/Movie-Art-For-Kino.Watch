@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.webkit.MimeTypeMap
 import com.movieart.kinowatch.helpers.BackgroundPickerHelper
+import com.movieart.kinowatch.helpers.TrailerManager
 import com.movieart.kinowatch.helpers.LottieEditorRegex
 import com.movieart.kinowatch.helpers.cleanExpiredCache
 import com.movieart.kinowatch.helpers.exposeFileToOtherApps
@@ -122,9 +123,11 @@ class WallpaperProviderService : Service() {
         override fun getWallpapers(event: Event?): List<Wallpaper> {
 
             // Debug bookkeeping, so we can diagnose what Projectivy is actually sending us from
-            // the Settings screen alone, without ADB. See docs/fork-notes.md.
-            PreferencesManager.getWallpapersCallCount += 1
-            PreferencesManager.lastEventDebug = describeEventForDebug(event)
+            // the Settings screen alone, without ADB. See KINOWATCH_FORK_README.md.
+            if (event !is Event.TimeElapsed) {
+                PreferencesManager.getWallpapersCallCount += 1
+                PreferencesManager.lastEventDebug = describeEventForDebug(event)
+            }
             if (event is Event.ProgramCardFocused) {
                 PreferencesManager.programCardCount += 1
                 PreferencesManager.lastProgramCardDebug = describeEventForDebug(event)
@@ -148,11 +151,22 @@ class WallpaperProviderService : Service() {
             return when (event) {
                 // When the focused card changes (app icons)
                 is Event.CardFocused -> {
+                    TrailerManager.clearFocus()
                     fallbackWallpaper(event)
                 }
 
+                // Projectivy's periodic tick: the moment to start the trailer, if it is due
+                is Event.TimeElapsed -> trailerWallpaperIfDue()
+
                 // When the focused "program" card changes (e.g. Kinowatch's "Я смотрю" row)
                 is Event.ProgramCardFocused -> {
+                    // Remember which title is focused and start fetching its trailer (if enabled)
+                    val focusedItemId = TrailerManager.itemIdFromPosterUrl(event.iconUri)
+                    if (PreferencesManager.trailerEnabled && focusedItemId != null) {
+                        TrailerManager.onCardFocused(that, focusedItemId)
+                    } else {
+                        TrailerManager.clearFocus()
+                    }
                     // Use the poster/backdrop URI exactly as the source app (Kinowatch) published
                     // it into Android TV's PreviewProgram/WatchNext data. No title search, no
                     // third-party matching - if this is null or fails to load, we fall back to
@@ -317,6 +331,22 @@ class WallpaperProviderService : Service() {
                 e.printStackTrace()
                 null
             }
+        }
+
+        private fun trailerWallpaperIfDue(): List<Wallpaper> {
+            if (!PreferencesManager.trailerEnabled) return emptyList()
+            val trailerUrl = TrailerManager.takeDueTrailerUrl(that, TrailerManager.TRAILER_DELAY_MS)
+                ?: return emptyList()
+            // The link (HLS stream) goes straight to Projectivy's own player - nothing is downloaded.
+            updateLastWallpaperSent(trailerUrl)
+            println("Movie Art: Sending trailer stream: $trailerUrl")
+            return listOf(
+                Wallpaper(
+                    uri = trailerUrl,
+                    type = WallpaperType.VIDEO,
+                    displayMode = tv.projectivy.plugin.wallpaperprovider.api.WallpaperDisplayMode.CROP
+                )
+            )
         }
 
         private fun updateLastWallpaperSent(uri: String) {

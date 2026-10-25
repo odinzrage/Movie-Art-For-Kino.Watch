@@ -1,6 +1,5 @@
 # Gradle files
 .gradle/
-.kotlin/
 build/
 
 # Local configuration file (sdk path, etc)
@@ -8,8 +7,6 @@ local.properties
 
 # Log/OS Files
 *.log
-.DS_Store
-Thumbs.db
 
 # Android Studio generated files and folders
 captures/
