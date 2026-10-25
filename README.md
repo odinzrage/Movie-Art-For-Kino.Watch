@@ -1,6 +1,5 @@
 # 🎬 Movie Art for Kino.Watch
 
-Плагин обоев для Android TV лаунчера [Projectivy](https://play.google.com/store/apps/details?id=com.spocky.projengmenu).
 Когда фокус стоит на карточке фильма или сериала из Kino.Watch (например, в строке «Я смотрю»),
 фоном лаунчера становится горизонтальный арт именно этого тайтла.
 
