@@ -1,3 +1,4 @@
+
 name: Build APK
 
 on:
@@ -8,14 +9,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # needed to create a release on tag push
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Optional: base64 keystore + passwords in repo secrets. Without them the release APK
-      # is signed with the (per-run) debug key - fine for testing, but users cannot update over it.
       RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
       RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
       RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -24,6 +23,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Validate release signing secrets
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          for secret_name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!secret_name:-}" ]]; then
+              echo "::error::Required GitHub Actions secret is missing: $secret_name"
+              exit 1
+            fi
+          done
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -31,13 +42,21 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Decode release keystore
+      - name: Decode and validate release keystore
         if: env.RELEASE_KEYSTORE_BASE64 != ''
+        shell: bash
         run: |
-          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          set -euo pipefail
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          test -s "$RUNNER_TEMP/release.jks"
+          keytool -list \
+            -keystore "$RUNNER_TEMP/release.jks" \
+            -storepass "$RELEASE_STORE_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS" >/dev/null
           echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Set version
+        shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
@@ -49,10 +68,37 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug assembleRelease
 
       - name: Rename APKs
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p out
           cp movie-art-plugin/build/outputs/apk/debug/*.apk out/movie-art-kinowatch-debug.apk
           cp movie-art-plugin/build/outputs/apk/release/*.apk out/movie-art-kinowatch.apk
+
+      - name: Verify release APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="out/movie-art-kinowatch.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+
+      - name: Verify release certificate matches keystore
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="out/movie-art-kinowatch.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          KEY_CERT_SHA="$(keytool -exportcert -keystore "$RELEASE_STORE_FILE" -storepass "$RELEASE_STORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS" | sha256sum | cut -d ' ' -f 1)"
+          APK_CERT_SHA="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print tolower($2); exit}' | tr -d ':')"
+          KEY_CERT_SHA="$(printf '%s' "$KEY_CERT_SHA" | tr '[:upper:]' '[:lower:]' | tr -d ':')"
+          if [[ -z "$APK_CERT_SHA" || "$APK_CERT_SHA" != "$KEY_CERT_SHA" ]]; then
+            echo "::error::Release APK certificate does not match the configured release keystore."
+            exit 1
+          fi
+          echo "Release APK is signed with the configured release certificate."
 
       - uses: actions/upload-artifact@v5
         with:
